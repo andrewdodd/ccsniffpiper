@@ -3,7 +3,7 @@ ccsniffpiper
 
 *Live Packet Sniffer to Wireshark bridge for IEEE 802.15.4 networks.*
 
-A Python module for that uses a Texas Instruments CC2531emk USB dongle to sniff packets and pipe them to (primarily) wireshark.
+A Python module that uses a Texas Instruments CC2531emk USB dongle to sniff packets and pipe them to (primarily) wireshark.
 
 This tool is a mashup of two existing GitHub projects:
  * **[sensniff](https://github.com/g-oikonomou/sensniff)**: A python tool by George Oikonomou to capture packets with the "sensniff" firmware for the TI CC2531 sniffer.
