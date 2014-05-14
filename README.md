@@ -3,6 +3,8 @@ ccsniffpiper
 
 *Live Packet Sniffer to Wireshark bridge for IEEE 802.15.4 networks.*
 
+NOTE WELL: I have implemented a new python script that does the same job as the TI Sniffer, but on the console. See **[pyCCSniffer](https://github.com/andrewdodd/pyCCSniffer)** for more details!
+
 A Python module that uses a Texas Instruments CC2531emk USB dongle to sniff packets and pipe them to (primarily) wireshark.
 
 This tool is a mashup of two existing GitHub projects:
