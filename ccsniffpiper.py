@@ -111,7 +111,7 @@ class PCAPHelper:
     THISZONE = 0
     SIGFIGS = 0
     SNAPLEN = 0xFFFF
-    NETWORK = LINKTYPE_IEEE802_15_4
+    NETWORK = LINKTYPE_IEEE802_15_4_NOFCS
 
     PCAP_GLOBAL_HDR_FMT = '<LHHlLLL'
 
@@ -334,7 +334,7 @@ class CC2531:
     def recv(self):
 
         while self.running:
-            bytesteam = self.dev.read(CC2531.DATA_EP, 4096, 0, CC2531.DATA_TIMEOUT)
+            bytesteam = self.dev.read(CC2531.DATA_EP, 4096, timeout=CC2531.DATA_TIMEOUT)
 #             print "RECV>> %s" % binascii.hexlify(bytesteam)
 
             if len(bytesteam) >= 3:
