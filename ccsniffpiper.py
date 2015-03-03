@@ -334,7 +334,7 @@ class CC2531:
     def recv(self):
 
         while self.running:
-            bytesteam = self.dev.read(CC2531.DATA_EP, 4096, 0, CC2531.DATA_TIMEOUT)
+            bytesteam = self.dev.read(CC2531.DATA_EP, 4096, timeout=CC2531.DATA_TIMEOUT)
 #             print "RECV>> %s" % binascii.hexlify(bytesteam)
 
             if len(bytesteam) >= 3:
