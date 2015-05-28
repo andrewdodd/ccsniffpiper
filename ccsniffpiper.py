@@ -542,7 +542,7 @@ if __name__ == '__main__':
     try:
 
         while 1:
-            if args.headless is True:
+            if args.headless is True and not snifferDev.isRunning():
                 snifferDev.start()
             else:
                 try:
