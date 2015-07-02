@@ -334,7 +334,15 @@ class CC2531:
     def recv(self):
 
         while self.running:
-            bytesteam = self.dev.read(CC2531.DATA_EP, 4096, 0, CC2531.DATA_TIMEOUT)
+            try:
+                bytesteam = self.dev.read(CC2531.DATA_EP, 4096, timeout=CC2531.DATA_TIMEOUT)
+            except usb.core.USBError as e:
+                # error 110 is timeout, just ignore, next read might work again
+                if e.errno == 110:
+                    continue
+                else:
+                    raise e
+
 #             print "RECV>> %s" % binascii.hexlify(bytesteam)
 
             if len(bytesteam) >= 3:
@@ -542,7 +550,7 @@ if __name__ == '__main__':
     try:
 
         while 1:
-            if args.headless is True:
+            if args.headless is True and not snifferDev.isRunning():
                 snifferDev.start()
             else:
                 try:
