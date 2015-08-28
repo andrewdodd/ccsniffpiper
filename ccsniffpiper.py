@@ -603,7 +603,7 @@ if __name__ == '__main__':
 #                        logger.debug('No user input')
                 except select.error:
                     logger.warn('Error while trying to read stdin')
-                except ValueError:
+                except ValueError as e:
                     print e
                 except UnboundLocalError:
                     # Raised by command 'n' when -o was specified at command line
