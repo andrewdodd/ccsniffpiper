@@ -1,0 +1,2 @@
+# TI CC2531 sniffer
+ATTRS{idVendor}=="0451", ATTRS{idProduct}=="16ae", MODE="664", GROUP="plugdev"
