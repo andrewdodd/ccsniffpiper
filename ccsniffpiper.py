@@ -569,8 +569,11 @@ if __name__ == '__main__':
     try:
 
         while 1:
-            if args.headless is True and not snifferDev.isRunning():
-                snifferDev.start()
+            if args.headless is True:
+                if not snifferDev.isRunning():
+                    snifferDev.start()
+                # block until terminated (Ctrl+C or killed)
+                snifferDev.thread.join()
             else:
                 try:
                     if select.select([sys.stdin, ], [], [], 10.0)[0]:
