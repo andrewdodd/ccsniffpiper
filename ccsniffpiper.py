@@ -132,9 +132,32 @@ class FifoHandler(object):
         self.out_fifo = out_fifo
         self.of = None
         self.needs_pcap_hdr = True
+        self.thread = None
+        self.running = False
         stats['Piped'] = 0
         stats['Not Piped'] = 0
         self.__create_fifo()
+        self.__start()
+
+    def __del__(self):
+        self.__stop()
+
+    def __start(self):
+        logger.debug("start FIFO watcher thread")
+        self.running = True
+        self.thread = threading.Thread(target=self.__fifo_watcher)
+        self.thread.daemon = True
+        self.thread.start()
+
+    def __stop(self):
+        logger.debug("stop FIFO watcher thread")
+        self.running = False
+        self.thread.join()
+
+    def __fifo_watcher(self):
+        while self.running:
+            self.__open_fifo(keepalive=True)
+            time.sleep(0.01)
 
     def __create_fifo(self):
         try:
@@ -151,20 +174,15 @@ class FifoHandler(object):
             else:
                 raise
 
-    def __open_fifo(self):
+    def __open_fifo(self, keepalive=False):
         try:
             fd = os.open(self.out_fifo, os.O_NONBLOCK | os.O_WRONLY)
             self.of = os.fdopen(fd, 'w')
         except OSError as e:
             if e.errno == errno.ENXIO:
-                logger.warn('Remote end not reading')
-                stats['Not Piped'] += 1
-                self.of = None
-                self.needs_pcap_hdr = True
-            elif e.errno == errno.ENOENT:
-                logger.error('%s vanished under our feet' % (self.out_fifo,))
-                logger.error('Trying to re-create it')
-                self.__create_fifo_file()
+                if not keepalive:
+                    logger.warn('Remote end not reading')
+                    stats['Not Piped'] += 1
                 self.of = None
                 self.needs_pcap_hdr = True
             else:
@@ -180,6 +198,7 @@ class FifoHandler(object):
         if self.of is not None:
             try:
                 if self.needs_pcap_hdr is True:
+                    logger.info('Write global PCAP header')
                     self.of.write(PCAPHelper.writeGlobalHeader())
                     self.needs_pcap_hdr = False
                 self.of.write(data.pcap)
@@ -550,8 +569,11 @@ if __name__ == '__main__':
     try:
 
         while 1:
-            if args.headless is True and not snifferDev.isRunning():
-                snifferDev.start()
+            if args.headless is True:
+                if not snifferDev.isRunning():
+                    snifferDev.start()
+                # block until terminated (Ctrl+C or killed)
+                snifferDev.thread.join()
             else:
                 try:
                     if select.select([sys.stdin, ], [], [], 10.0)[0]:
@@ -581,7 +603,7 @@ if __name__ == '__main__':
 #                        logger.debug('No user input')
                 except select.error:
                     logger.warn('Error while trying to read stdin')
-                except ValueError:
+                except ValueError as e:
                     print e
                 except UnboundLocalError:
                     # Raised by command 'n' when -o was specified at command line
