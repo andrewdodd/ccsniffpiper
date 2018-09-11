@@ -314,7 +314,7 @@ class CC2531:
             raise IOError("Device not found")
 
         self.dev.set_configuration() # must call this to establish the USB's "Config"
-        self.name = usb.util.get_string(self.dev, 256, 2) # get name from USB descriptor
+        self.name = self.dev.product or "CC2531 Sniffer Dongle"
         self.ident = self.dev.ctrl_transfer(CC2531.DIR_IN, CC2531.GET_IDENT, 0, 0, 256) # get identity from Firmware command
 
         # power on radio, wIndex = 4
