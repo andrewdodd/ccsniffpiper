@@ -47,7 +47,7 @@ import select
 import time
 import stat
 import errno
-import StringIO
+import io
 import logging.handlers
 import struct
 import threading
@@ -83,13 +83,12 @@ class Frame(object):
         self.__pcap_hdr = self.__generate_frame_hdr()
 
         self.pcap = self.__pcap_hdr + self.__macPDUByteArray
-        self.hex = ''.join('%02x ' % ord(c) for c in self.__macPDUByteArray).rstrip()
+        self.hex = ''.join('%02x ' % c for c in self.__macPDUByteArray).rstrip()
 
     def __generate_frame_hdr(self):
-        sec = 0
-        usec = self.timestampUsec
-        return struct.pack(Frame.PCAP_FRAME_HDR_FMT,
-                           sec, usec, self.len, self.len)
+        sec = int(self.timestampUsec / 1000000)
+        usec = int(self.timestampUsec - sec)
+        return struct.pack(Frame.PCAP_FRAME_HDR_FMT, sec, usec, self.len, self.len)
 
     def get_pcap(self):
         return self.pcap
@@ -177,7 +176,7 @@ class FifoHandler(object):
     def __open_fifo(self, keepalive=False):
         try:
             fd = os.open(self.out_fifo, os.O_NONBLOCK | os.O_WRONLY)
-            self.of = os.fdopen(fd, 'w')
+            self.of = os.fdopen(fd, 'wb')
         except OSError as e:
             if e.errno == errno.ENXIO:
                 if not keepalive:
@@ -220,7 +219,7 @@ class PcapDumpHandler(object):
         stats['Dumped to PCAP'] = 0
 
         try:
-            self.of = open(self.filename, 'w')
+            self.of = open(self.filename, 'wb')
             self.of.write(PCAPHelper.writeGlobalHeader())
             logger.info("Dumping PCAP to %s" % (self.filename,))
         except IOError as e:
@@ -258,12 +257,12 @@ class HexdumpHandler(object):
 
         try:
             # Prepend the original timestamp in big-endian format
-            self.of.write(binascii.hexlify(struct.pack(">I ", frame.get_timestamp()*32)))
+            self.of.write(binascii.hexlify(struct.pack(">I ", int(frame.get_timestamp()*32))))
             #self.of.write(str(frame.get_timestamp()))
-            self.of.write("  ")
+            self.of.write(bytes("  ", 'ascii'))
 #             self.of.write('0000 ')
-            self.of.write(frame.get_hex())
-            self.of.write('\n')
+            self.of.write(bytes(frame.get_hex(), 'ascii'))
+            self.of.write(bytes('\n', 'ascii'))
             self.of.flush()
             stats['Dumped as Hex'] += 1
             logger.info('HexdumpHandler: Dumped a frame of size %d bytes'
@@ -433,7 +432,7 @@ def arg_parser():
 
     in_group = parser.add_argument_group('Input Options')
     in_group.add_argument('-c', '--channel', type = int, action = 'store',
-                          choices = range(11, 27),
+                          choices = list(range(11, 27)),
                           default = defaults['channel'],
                           help = 'Set the sniffer\'s CHANNEL. Valid range: 11-26. \
                                   (Default: %s)' % (defaults['channel'],))
@@ -497,13 +496,13 @@ def arg_parser():
     return parser.parse_args()
 
 def dump_stats():
-    s = StringIO.StringIO()
+    s = io.StringIO()
 
     s.write('Frame Stats:\n')
-    for k, v in stats.items():
+    for k, v in list(stats.items()):
         s.write('%20s: %d\n' % (k, v))
 
-    print(s.getvalue())
+    print((s.getvalue()))
 
 def log_init():
     logger.setLevel(logging.DEBUG)
@@ -551,7 +550,7 @@ if __name__ == '__main__':
         handlers.append(PcapDumpHandler(args.pcap_file))
 
     if args.headless is False:
-        h = StringIO.StringIO()
+        h = io.StringIO()
         h.write('Commands:\n')
         h.write('c: Print current RF Channel\n')
         h.write('n: Trigger new pcap header before the next frame\n')
@@ -563,7 +562,7 @@ if __name__ == '__main__':
 
         e = 'Unknown Command. Type h or ? for help'
 
-        print h
+        print(h)
 
     snifferDev = CC2531(handlerDispatcher, args.channel)
     try:
@@ -580,11 +579,11 @@ if __name__ == '__main__':
                         cmd = sys.stdin.readline().rstrip()
                         logger.debug('User input: "%s"' % (cmd,))
                         if cmd in ('h', '?'):
-                            print h
+                            print(h)
                         elif cmd == 'c':
                             # We'll only ever see this if the user asked for it, so we are
                             # running interactive. Print away
-                            print 'Sniffing in channel: %d' % (snifferDev.get_channel(),)
+                            print('Sniffing in channel: %d' % (snifferDev.get_channel(),))
                         elif cmd == 'n':
                             f.triggerNewGlobalHeader()
                         elif cmd == 'q':
@@ -604,7 +603,7 @@ if __name__ == '__main__':
                 except select.error:
                     logger.warn('Error while trying to read stdin')
                 except ValueError as e:
-                    print e
+                    print(e)
                 except UnboundLocalError:
                     # Raised by command 'n' when -o was specified at command line
                     pass
