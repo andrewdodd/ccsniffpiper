@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-
 """
 
    ccsniffpiper - a python module to connect to the CC2531emk USB dongle
@@ -29,7 +28,6 @@
    along with this program; if not, write to the Free Software Foundation,
    Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301  USA
 """
-
 """
    Functionality
    -------------
@@ -41,20 +39,20 @@
 """
 
 import argparse
-import os
-import sys
-import select
-import time
-import stat
+import binascii
 import errno
 import io
 import logging.handlers
+import os
+import select
+import stat
 import struct
+import sys
 import threading
-import binascii
+import time
+
 import usb.core
 import usb.util
-from locale import str
 
 __version__ = '0.0.1'
 
@@ -71,6 +69,7 @@ defaults = {
 logger = logging.getLogger(__name__)
 stats = {}
 
+
 class Frame(object):
     PCAP_FRAME_HDR_FMT = '<LLLL'
 
@@ -83,12 +82,14 @@ class Frame(object):
         self.__pcap_hdr = self.__generate_frame_hdr()
 
         self.pcap = self.__pcap_hdr + self.__macPDUByteArray
-        self.hex = ''.join('%02x ' % c for c in self.__macPDUByteArray).rstrip()
+        self.hex = ''.join('%02x ' % c
+                           for c in self.__macPDUByteArray).rstrip()
 
     def __generate_frame_hdr(self):
         sec = int(self.timestampUsec / 1000000)
         usec = int(self.timestampUsec - sec)
-        return struct.pack(Frame.PCAP_FRAME_HDR_FMT, sec, usec, self.len, self.len)
+        return struct.pack(Frame.PCAP_FRAME_HDR_FMT, sec, usec, self.len,
+                           self.len)
 
     def get_pcap(self):
         return self.pcap
@@ -99,7 +100,9 @@ class Frame(object):
     def get_timestamp(self):
         return self.timestampUsec
 
+
 #####################################
+
 
 class PCAPHelper:
     LINKTYPE_IEEE802_15_4_NOFCS = 230
@@ -116,15 +119,12 @@ class PCAPHelper:
 
     @staticmethod
     def writeGlobalHeader():
-        return struct.pack(
-            PCAPHelper.PCAP_GLOBAL_HDR_FMT,
-            PCAPHelper.MAGIC_NUMBER,
-            PCAPHelper.VERSION_MAJOR,
-            PCAPHelper.VERSION_MINOR,
-            PCAPHelper.THISZONE,
-            PCAPHelper.SIGFIGS,
-            PCAPHelper.SNAPLEN,
-            PCAPHelper.NETWORK)
+        return struct.pack(PCAPHelper.PCAP_GLOBAL_HDR_FMT,
+                           PCAPHelper.MAGIC_NUMBER, PCAPHelper.VERSION_MAJOR,
+                           PCAPHelper.VERSION_MINOR, PCAPHelper.THISZONE,
+                           PCAPHelper.SIGFIGS, PCAPHelper.SNAPLEN,
+                           PCAPHelper.NETWORK)
+
 
 class FifoHandler(object):
     def __init__(self, out_fifo):
@@ -259,10 +259,12 @@ class HexdumpHandler(object):
 
         try:
             # Prepend the original timestamp in big-endian format
-            self.of.write(binascii.hexlify(struct.pack(">I ", int(frame.get_timestamp()*32))))
+            self.of.write(
+                binascii.hexlify(
+                    struct.pack(">I ", int(frame.get_timestamp() * 32))))
             #self.of.write(str(frame.get_timestamp()))
             self.of.write(bytes("  ", 'ascii'))
-#             self.of.write('0000 ')
+            #             self.of.write('0000 ')
             self.of.write(bytes(frame.get_hex(), 'ascii'))
             self.of.write(bytes('\n', 'ascii'))
             self.of.flush()
@@ -277,27 +279,28 @@ class HexdumpHandler(object):
 
 class CC2531:
 
-    DEFAULT_CHANNEL = 0x0B # 11
+    DEFAULT_CHANNEL = 0x0B  # 11
 
     DATA_EP = 0x83
     DATA_TIMEOUT = 2500
 
     DIR_OUT = 0x40
-    DIR_IN  = 0xc0
+    DIR_IN = 0xc0
 
     GET_IDENT = 0xc0
     SET_POWER = 0xc5
     GET_POWER = 0xc6
 
-    SET_START = 0xd0 # bulk in starts
-    SET_STOP  = 0xd1 # bulk in stops
-    SET_CHAN  = 0xd2 # 0x0d (idx 0) + data)0x00 (idx 1)
+    SET_START = 0xd0  # bulk in starts
+    SET_STOP = 0xd1  # bulk in stops
+    SET_CHAN = 0xd2  # 0x0d (idx 0) + data)0x00 (idx 1)
 
     HEARTBEAT_FRAME = 0x01
     COMMAND_FRAME = 0x00
-#     COMMAND_CHANNEL = ??
 
-    def __init__(self, callback, channel = DEFAULT_CHANNEL):
+    #     COMMAND_CHANNEL = ??
+
+    def __init__(self, callback, channel=DEFAULT_CHANNEL):
 
         stats['Captured'] = 0
         stats['Non-Frame'] = 0
@@ -311,21 +314,27 @@ class CC2531:
         try:
             self.dev = usb.core.find(idVendor=0x0451, idProduct=0x16ae)
         except usb.core.USBError:
-            raise OSError("Permission denied, you need to add an udev rule for this device", errno=errno.EACCES)
+            raise OSError(
+                "Permission denied, you need to add an udev rule for this device",
+                errno=errno.EACCES)
 
         if self.dev is None:
             raise IOError("Device not found")
 
-        self.dev.set_configuration() # must call this to establish the USB's "Config"
+        self.dev.set_configuration(
+        )  # must call this to establish the USB's "Config"
         self.name = self.dev.product or "CC2531 Sniffer Dongle"
-        self.ident = self.dev.ctrl_transfer(CC2531.DIR_IN, CC2531.GET_IDENT, 0, 0, 256) # get identity from Firmware command
+        self.ident = self.dev.ctrl_transfer(
+            CC2531.DIR_IN, CC2531.GET_IDENT, 0, 0,
+            256)  # get identity from Firmware command
 
         # power on radio, wIndex = 4
         self.dev.ctrl_transfer(CC2531.DIR_OUT, CC2531.SET_POWER, wIndex=4)
 
         while True:
             # check if powered up
-            power_status = self.dev.ctrl_transfer(CC2531.DIR_IN, CC2531.GET_POWER, 0, 0, 1)
+            power_status = self.dev.ctrl_transfer(CC2531.DIR_IN,
+                                                  CC2531.GET_POWER, 0, 0, 1)
             if power_status[0] == 4: break
             time.sleep(0.1)
 
@@ -357,13 +366,16 @@ class CC2531:
 
         while self.running:
             try:
-                bytesteam = self.dev.read(CC2531.DATA_EP, 4096, timeout=CC2531.DATA_TIMEOUT)
+                bytesteam = self.dev.read(CC2531.DATA_EP,
+                                          4096,
+                                          timeout=CC2531.DATA_TIMEOUT)
             except usb.core.USBError as e:
                 # error 110 is timeout, just ignore, next read might work again
                 if e.errno == 110:
                     continue
                 else:
                     raise e
+
 
 #             print "RECV>> %s" % binascii.hexlify(bytesteam)
 
@@ -386,12 +398,10 @@ class CC2531:
                                 f'Received a frame with incorrect length, pktLen:{pktLen}, len(frame):{len(frame)}'
                             )
 
-
-#                     elif cmd == CC2531.COMMAND_CHANNEL:
-#                         logger.info('Received a command response: [%02x %02x]' % (cmd, payload[0]))
-#                         # We'll only ever see this if the user asked for it, so we are
-#                         # running interactive. Print away
-#                         print 'Sniffing in channel: %d' % (payload[0],)
+                    # elif cmd == CC2531.COMMAND_CHANNEL:
+                    #     logger.info('Received a command response: [%02x %02x]' % (cmd, payload[0]))
+                    #     # We'll only ever see this if the user asked for it, so we are
+                    #     # running interactive.
                     elif CC2531.HEARTBEAT_FRAME == cmd:
                         logger.debug(f'Heartbeat - {payload[0]}')
                     else:
@@ -409,8 +419,10 @@ class CC2531:
             self.channel = channel
 
             # set channel command
-            self.dev.ctrl_transfer(CC2531.DIR_OUT, CC2531.SET_CHAN, 0, 0, [channel])
-            self.dev.ctrl_transfer(CC2531.DIR_OUT, CC2531.SET_CHAN, 0, 1, [0x00])
+            self.dev.ctrl_transfer(CC2531.DIR_OUT, CC2531.SET_CHAN, 0, 0,
+                                   [channel])
+            self.dev.ctrl_transfer(CC2531.DIR_OUT, CC2531.SET_CHAN, 0, 1,
+                                   [0x00])
 
             self.get_channel()
 
@@ -432,79 +444,113 @@ class CC2531:
 
 
 def arg_parser():
-    debug_choices = ('DEBUG', 'INFO', 'WARN', 'ERROR')
+    debug_choices = ('DEBUG', 'INFO', 'WARNING', 'ERROR')
 
-    parser = argparse.ArgumentParser(add_help = False,
-                                     description = 'Read IEEE802.15.4 frames \
+    parser = argparse.ArgumentParser(add_help=False,
+                                     description='Read IEEE802.15.4 frames \
     from a CC2531 packet sniffer device, convert them to pcap and pipe them \
     into wireshark over a FIFO pipe for online analysis. Frames \
     can also be saved in a file in hexdump and/or pcap format for offline \
     analysis.')
 
     in_group = parser.add_argument_group('Input Options')
-    in_group.add_argument('-c', '--channel', type = int, action = 'store',
-                          choices = list(range(11, 27)),
-                          default = defaults['channel'],
-                          help = 'Set the sniffer\'s CHANNEL. Valid range: 11-26. \
-                                  (Default: %s)' % (defaults['channel'],))
+    in_group.add_argument(
+        '-c',
+        '--channel',
+        type=int,
+        action='store',
+        choices=list(range(11, 27)),
+        default=defaults['channel'],
+        help='Set the sniffer\'s CHANNEL. Valid range: 11-26. \
+                                  (Default: %s)' % (defaults['channel'], ))
     out_group = parser.add_argument_group('Output Options')
-    out_group.add_argument('-f', '--fifo', action = 'store',
-                           default = defaults['out_fifo'],
-                           help = 'Set FIFO as the named pipe for sending to wireshark. \
+    out_group.add_argument(
+        '-f',
+        '--fifo',
+        action='store',
+        default=defaults['out_fifo'],
+        help='Set FIFO as the named pipe for sending to wireshark. \
                                    If argument is omitted and -o option is not specified \
-                                   the capture will pipe to: %s' % (defaults['out_fifo'],))
-    out_group.add_argument('-o', '--offline', action = 'store_true',
-                           default = False,
-                           help = 'Disables sending the capture to the named pipe.')
-    out_group.add_argument('-x', '--hex-file', action = 'store', nargs = '?',
-                           const = defaults['hex_file'], default = False,
-                           help = 'Save the capture (hexdump) in HEX_FILE. \
+                                   the capture will pipe to: %s' %
+        (defaults['out_fifo'], ))
+    out_group.add_argument(
+        '-o',
+        '--offline',
+        action='store_true',
+        default=False,
+        help='Disables sending the capture to the named pipe.')
+    out_group.add_argument('-x',
+                           '--hex-file',
+                           action='store',
+                           nargs='?',
+                           const=defaults['hex_file'],
+                           default=False,
+                           help='Save the capture (hexdump) in HEX_FILE. \
                                    If -x is specified but HEX_FILE is omitted, \
                                    %s will be used. If the argument is \
                                    omitted altogether, the capture will not \
-                                   be saved.' % (defaults['hex_file'],))
-    out_group.add_argument('-p', '--pcap-file', action = 'store', nargs = '?',
-                           const = defaults['pcap_file'], default = False,
-                           help = 'Save the capture (pcap format) in PCAP_FILE. \
+                                   be saved.' % (defaults['hex_file'], ))
+    out_group.add_argument('-p',
+                           '--pcap-file',
+                           action='store',
+                           nargs='?',
+                           const=defaults['pcap_file'],
+                           default=False,
+                           help='Save the capture (pcap format) in PCAP_FILE. \
                                    If -p is specified but PCAP_FILE is omitted, \
                                    %s will be used. If the argument is \
                                    omitted altogether, the capture will not \
-                                   be saved.' % (defaults['pcap_file'],))
-
+                                   be saved.' % (defaults['pcap_file'], ))
 
     log_group = parser.add_argument_group('Verbosity and Logging')
-    log_group.add_argument('-d', '--headless', action = 'store_true',
-                           default = False,
-                           help = 'Run in non-interactive/headless mode, without \
+    log_group.add_argument(
+        '-d',
+        '--headless',
+        action='store_true',
+        default=False,
+        help='Run in non-interactive/headless mode, without \
                                    accepting user input. (Default Disabled)')
-    log_group.add_argument('-D', '--debug-level', action = 'store',
-                           choices = debug_choices,
-                           default = defaults['debug_level'],
-                           help = 'Print messages of severity DEBUG_LEVEL \
-                                   or higher (Default %s)'
-                                   % (defaults['debug_level'],))
-    log_group.add_argument('-L', '--log-file', action = 'store', nargs = '?',
-                           const = defaults['log_file'], default = False,
-                           help = 'Log output in LOG_FILE. If -L is specified \
+    log_group.add_argument('-D',
+                           '--debug-level',
+                           action='store',
+                           choices=debug_choices,
+                           default=defaults['debug_level'],
+                           help='Print messages of severity DEBUG_LEVEL \
+                                   or higher (Default %s)' %
+                           (defaults['debug_level'], ))
+    log_group.add_argument('-L',
+                           '--log-file',
+                           action='store',
+                           nargs='?',
+                           const=defaults['log_file'],
+                           default=False,
+                           help='Log output in LOG_FILE. If -L is specified \
                                    but LOG_FILE is omitted, %s will be used. \
                                    If the argument is omitted altogether, \
-                                   logging will not take place at all.'
-                                   % (defaults['log_file'],))
-    log_group.add_argument('-l', '--log-level', action = 'store',
-                           choices = debug_choices,
-                           default = defaults['log_level'],
-                           help = 'Log messages of severity LOG_LEVEL or \
+                                   logging will not take place at all.' %
+                           (defaults['log_file'], ))
+    log_group.add_argument('-l',
+                           '--log-level',
+                           action='store',
+                           choices=debug_choices,
+                           default=defaults['log_level'],
+                           help='Log messages of severity LOG_LEVEL or \
                                    higher. Only makes sense if -L is also \
-                                   specified (Default %s)'
-                                   % (defaults['log_level'],))
+                                   specified (Default %s)' %
+                           (defaults['log_level'], ))
 
     gen_group = parser.add_argument_group('General Options')
-    gen_group.add_argument('-v', '--version', action = 'version',
-                           version = 'ccsniffpiper v%s' % (__version__))
-    gen_group.add_argument('-h', '--help', action = 'help',
-                           help = 'Shows this message and exits')
+    gen_group.add_argument('-v',
+                           '--version',
+                           action='version',
+                           version='ccsniffpiper v%s' % (__version__))
+    gen_group.add_argument('-h',
+                           '--help',
+                           action='help',
+                           help='Shows this message and exits')
 
     return parser.parse_args()
+
 
 def dump_stats():
     s = io.StringIO()
@@ -515,6 +561,7 @@ def dump_stats():
 
     print((s.getvalue()))
 
+
 def log_init():
     logger.setLevel(logging.DEBUG)
     ch = logging.StreamHandler()
@@ -524,13 +571,13 @@ def log_init():
     logger.addHandler(ch)
 
     if args.log_file is not False:
-        fh = logging.handlers.RotatingFileHandler(filename = args.log_file,
-                                                  maxBytes = 5000000)
+        fh = logging.handlers.RotatingFileHandler(filename=args.log_file,
+                                                  maxBytes=5000000)
         fh.setLevel(getattr(logging, args.log_level))
-        ff = logging.Formatter(
-            '%(asctime)s - %(levelname)8s - %(message)s')
+        ff = logging.Formatter('%(asctime)s - %(levelname)8s - %(message)s')
         fh.setFormatter(ff)
         logger.addHandler(fh)
+
 
 if __name__ == '__main__':
     args = arg_parser()
@@ -551,9 +598,8 @@ if __name__ == '__main__':
             for h in handlers:
                 h.handle(frame)
 
-
     if args.offline is not True:
-        f = FifoHandler(out_fifo = args.fifo)
+        f = FifoHandler(out_fifo=args.fifo)
         handlers.append(f)
     if args.hex_file is not False:
         handlers.append(HexdumpHandler(args.hex_file))
@@ -586,7 +632,9 @@ if __name__ == '__main__':
                 snifferDev.thread.join()
             else:
                 try:
-                    if select.select([sys.stdin, ], [], [], 10.0)[0]:
+                    if select.select([
+                            sys.stdin,
+                    ], [], [], 10.0)[0]:
                         cmd = sys.stdin.readline().rstrip()
                         logger.debug(f'User input: "{cmd}"')
                         if cmd in ('h', '?'):
@@ -627,4 +675,3 @@ if __name__ == '__main__':
             snifferDev.stop()
         dump_stats()
         sys.exit(0)
-
