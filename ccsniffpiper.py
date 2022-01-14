@@ -62,7 +62,7 @@ defaults = {
     'hex_file': 'ccsniffpiper.hexdump',
     'out_fifo': '/tmp/ccsniffpiper',
     'pcap_file': 'ccsniffpiper.pcap',
-    'debug_level': 'WARN',
+    'debug_level': 'WARNING',
     'log_level': 'INFO',
     'log_file': 'ccsniffpiper.log',
     'channel': 11,
@@ -161,15 +161,15 @@ class FifoHandler(object):
     def __create_fifo(self):
         try:
             os.mkfifo(self.out_fifo)
-            logger.info('Opened FIFO %s' % (self.out_fifo,))
+            logger.info(f'Opened FIFO {self.out_fifo}')
         except OSError as e:
             if e.errno == errno.EEXIST:
                 if stat.S_ISFIFO(os.stat(self.out_fifo).st_mode) is False:
-                    logger.error('File %s exists and is not a FIFO'
-                                 % (self.out_fifo,))
+                    logger.error(
+                        'File {self.out_fifo} exists and is not a FIFO')
                     sys.exit(1)
                 else:
-                    logger.warn('FIFO %s exists. Using it' % (self.out_fifo,))
+                    logger.warning(f'FIFO {self.out_fifo} exists. Using it')
             else:
                 raise
 
@@ -180,7 +180,7 @@ class FifoHandler(object):
         except OSError as e:
             if e.errno == errno.ENXIO:
                 if not keepalive:
-                    logger.warn('Remote end not reading')
+                    logger.warning('Remote end not reading')
                     stats['Not Piped'] += 1
                 self.of = None
                 self.needs_pcap_hdr = True
@@ -202,7 +202,7 @@ class FifoHandler(object):
                     self.needs_pcap_hdr = False
                 self.of.write(data.pcap)
                 self.of.flush()
-                logger.debug('Wrote a frame of size %d bytes' % (data.len))
+                logger.debug(f'Wrote a frame of size {data.len} bytes')
                 stats['Piped'] += 1
             except IOError as e:
                 if e.errno == errno.EPIPE:
@@ -212,6 +212,8 @@ class FifoHandler(object):
                     self.needs_pcap_hdr = True
                 else:
                     raise
+
+
 #####################################
 class PcapDumpHandler(object):
     def __init__(self, filename):
@@ -221,22 +223,22 @@ class PcapDumpHandler(object):
         try:
             self.of = open(self.filename, 'wb')
             self.of.write(PCAPHelper.writeGlobalHeader())
-            logger.info("Dumping PCAP to %s" % (self.filename,))
+            logger.info(f'Dumping PCAP to {self.filename}')
         except IOError as e:
             self.of = None
-            logger.warn("Error opening %s to save pcap. Skipping"
-                         % (self.filename))
-            logger.warn("The error was: %d - %s"
-                         % (e.args))
+            logger.warning(
+                f'Error opening {self.filename} to save pcap. Skipping')
+            logger.warning(f'The error was: {e.args}')
 
     def handle(self, frame):
         if self.of is None:
             return
         self.of.write(frame.get_pcap())
         self.of.flush()
-        logger.info('PcapDumpHandler: Dumped a frame of size %d bytes'
-                     % (frame.len))
+        logger.info(
+            f'PcapDumpHandler: Dumped a frame of size {frame.len} bytes')
         stats['Dumped to PCAP'] += 1
+
 
 class HexdumpHandler(object):
     def __init__(self, filename):
@@ -244,11 +246,11 @@ class HexdumpHandler(object):
         stats['Dumped as Hex'] = 0
         try:
             self.of = open(self.filename, 'wb')
-            logger.info("Dumping hex to %s" % (self.filename,))
+            logger.info(f'Dumping hex to {self.filename}')
         except IOError as e:
-            logger.warn("Error opening %s for hex dumps. Skipping"
-                         % (self.filename))
-            logger.warn("The error was: %d - %s" % (e.args))
+            logger.warning(
+                f'Error opening {self.filename} for hex dumps. Skipping')
+            logger.warning(f'The error was: {e.args}')
             self.of = None
 
     def handle(self, frame):
@@ -265,12 +267,13 @@ class HexdumpHandler(object):
             self.of.write(bytes('\n', 'ascii'))
             self.of.flush()
             stats['Dumped as Hex'] += 1
-            logger.info('HexdumpHandler: Dumped a frame of size %d bytes'
-                         % (frame.len))
+            logger.info(
+                f'HexdumpHandler: Dumped a frame of size {frame.len} bytes')
         except IOError as e:
-            logger.warn("Error writing hex to %s for hex dumps. Skipping"
-                     % (self.of))
-            logger.warn("The error was: %d - %s" % (e.args))
+            logger.warning(
+                f'Error writing hex to {self.of} for hex dumps. Skipping')
+            logger.warning(f'The error was: {e.args}')
+
 
 class CC2531:
 
@@ -369,7 +372,7 @@ class CC2531:
                 if len(bytesteam) == cmdLen:
                     # buffer contains the correct number of bytes
                     if CC2531.COMMAND_FRAME == cmd:
-                        logger.info('Read a frame of size %d' % (cmdLen,))
+                        logger.info(f'Read a frame of size {cmdLen}')
                         stats['Captured'] += 1
                         (timestamp, pktLen) = struct.unpack_from("<IB", bytesteam)
                         frame = bytesteam[5:]
@@ -377,7 +380,10 @@ class CC2531:
                         if len(frame) == pktLen:
                             self.callback(timestamp, frame.tostring())
                         else:
-                            logger.warn("Received a frame with incorrect length, pkgLen:%d, len(frame):%d" %(pktLen, len(frame)))
+                            logger.warning(
+                                f'Received a frame with incorrect length, pktLen:{pktLen}, len(frame):{len(frame)}'
+                            )
+
 
 #                     elif cmd == CC2531.COMMAND_CHANNEL:
 #                         logger.info('Received a command response: [%02x %02x]' % (cmd, bytesteam[0]))
@@ -385,8 +391,9 @@ class CC2531:
 #                         # running interactive. Print away
 #                         print 'Sniffing in channel: %d' % (bytesteam[0],)
                     else:
-                        logger.warn("Received a command response with unknown code - CMD:%02x byte:%02x]" % (cmd, bytesteam[0]))
-
+                        logger.warning(
+                            'Received a command response with unknown code - CMD:{:02x} byte:{}'
+                            .format(cmd, bytesteam))
 
     def set_channel(self, channel):
         was_running = self.running
@@ -577,13 +584,15 @@ if __name__ == '__main__':
                 try:
                     if select.select([sys.stdin, ], [], [], 10.0)[0]:
                         cmd = sys.stdin.readline().rstrip()
-                        logger.debug('User input: "%s"' % (cmd,))
+                        logger.debug(f'User input: "{cmd}"')
                         if cmd in ('h', '?'):
                             print(h)
                         elif cmd == 'c':
                             # We'll only ever see this if the user asked for it, so we are
                             # running interactive. Print away
-                            print('Sniffing in channel: %d' % (snifferDev.get_channel(),))
+                            print(
+                                f'Sniffing in channel: {snifferDev.get_channel()}'
+                            )
                         elif cmd == 'n':
                             f.triggerNewGlobalHeader()
                         elif cmd == 'q':
@@ -601,7 +610,7 @@ if __name__ == '__main__':
 #                    else:
 #                        logger.debug('No user input')
                 except select.error:
-                    logger.warn('Error while trying to read stdin')
+                    logger.warning('Error while trying to read stdin')
                 except ValueError as e:
                     print(e)
                 except UnboundLocalError:
