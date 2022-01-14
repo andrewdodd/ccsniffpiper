@@ -293,6 +293,7 @@ class CC2531:
     SET_STOP  = 0xd1 # bulk in stops
     SET_CHAN  = 0xd2 # 0x0d (idx 0) + data)0x00 (idx 1)
 
+    HEARTBEAT_FRAME = 0x01
     COMMAND_FRAME = 0x00
 #     COMMAND_CHANNEL = ??
 
@@ -368,17 +369,18 @@ class CC2531:
 
             if len(bytesteam) >= 3:
                 (cmd, cmdLen) = struct.unpack_from("<BH", bytesteam)
-                bytesteam = bytesteam[3:]
-                if len(bytesteam) == cmdLen:
+                payload = bytesteam[3:]
+                if len(payload) == cmdLen:
                     # buffer contains the correct number of bytes
                     if CC2531.COMMAND_FRAME == cmd:
                         logger.info(f'Read a frame of size {cmdLen}')
                         stats['Captured'] += 1
-                        (timestamp, pktLen) = struct.unpack_from("<IB", bytesteam)
-                        frame = bytesteam[5:]
+                        (timestamp,
+                         pktLen) = struct.unpack_from("<IB", payload)
+                        frame = payload[5:]
 
                         if len(frame) == pktLen:
-                            self.callback(timestamp, frame.tostring())
+                            self.callback(timestamp, frame.tobytes())
                         else:
                             logger.warning(
                                 f'Received a frame with incorrect length, pktLen:{pktLen}, len(frame):{len(frame)}'
@@ -386,10 +388,12 @@ class CC2531:
 
 
 #                     elif cmd == CC2531.COMMAND_CHANNEL:
-#                         logger.info('Received a command response: [%02x %02x]' % (cmd, bytesteam[0]))
+#                         logger.info('Received a command response: [%02x %02x]' % (cmd, payload[0]))
 #                         # We'll only ever see this if the user asked for it, so we are
 #                         # running interactive. Print away
-#                         print 'Sniffing in channel: %d' % (bytesteam[0],)
+#                         print 'Sniffing in channel: %d' % (payload[0],)
+                    elif CC2531.HEARTBEAT_FRAME == cmd:
+                        logger.debug(f'Heartbeat - {payload[0]}')
                     else:
                         logger.warning(
                             'Received a command response with unknown code - CMD:{:02x} byte:{}'
