@@ -62,10 +62,24 @@ This is just documentation of the packet format from the TI USB dongle. It is no
     
  * **COMMAND**: (1 byte) - Not entirely sure of all of these values. Currently there are only 2:
   * 0x00 - Message is a captured frame
-  * 0x01 - Message appears to be a heartbeat of some sort (seems to include the "captured count")
+  * 0x01 - Message appears to be a heartbeat of some sort (seems to include the an 8-bit count that goes up by 4 every 2.097 seconds)
  * **Length**: (2 bytes) - The length of the rest of the message
  * **Timestamp**: (4 bytes) - The sniffer's timestamp of the captured packet since the "start" of the capture.
    * **Note Well**: This timestamp is in usecs and is multiplied by 32 (see CC2531 user guide for info)
  * **Packet Length**: (1 byte) - Length of the MAC Layer PDU (i.e. the "frame length" / PHY Header byte)
  * **MAC Layer PDU**: Variable length specified in Packet Length.
+
+ 
+FAQs
+====
+### I don't see anything appearing in Wireshark!
+
+ * Check that the sniffer is sniffing in the correct channel.
+ * Check that you have opened the named pipe that is being piped to.  
+   *In particular, I would recommend reading the "Run Wireshark" section carefully.*
+   
+### Wireshark is reporting that the FCS is invalid!
+
+ * **Fix this:** by opening Wireshark's preferences, and under __Protocols -> IEEE 802.15.4__ select *'TI CC24xx FCS format'*. 
+ * Wireshark's default setting for the IEEE 803.15.4 protocol is that the FCS will be what radio frame would have. However, the TI chip replaces this for successfully received frames with information about RSSI, CORRELATION and FCS_OK (You can read this in section 23.9.7 Frame-Check Sequence of the [TI User Guide](https://www.ti.com/lit/pdf/swru191)).
 
